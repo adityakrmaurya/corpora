@@ -1,0 +1,55 @@
+[
+  {
+    "label": "Gradle: Build All",
+    "command": "./gradlew",
+    "args": ["build"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["gradle-build"]
+  },
+  {
+    "label": "Gradle: Test All",
+    "command": "./gradlew",
+    "args": ["test"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["gradle-test"]
+  },
+  {
+    "label": "Gradle: Clean",
+    "command": "./gradlew",
+    "args": ["clean"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Gradle: Checkstyle (Google) All",
+    "command": "./gradlew",
+    "args": ["checkstyleMain", "checkstyleTest"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["gradle-checkstyle"]
+  },
+  {
+    "label": "Gradle: Build (current module)",
+    "command": "./gradlew",
+    "args": ["-p", "$ZED_DIRNAME", "build"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Gradle: Test (current module)",
+    "command": "./gradlew",
+    "args": ["-p", "$ZED_DIRNAME", "test"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["gradle-test"]
+  },
+  {
+    "label": "Gradle: bootRun (current module)",
+    "command": "./gradlew",
+    "args": ["-p", "$ZED_DIRNAME", "bootRun"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "tags": ["gradle-run"]
+  },
+  {
+    "label": "Gradle: Compile (current module)",
+    "command": "./gradlew",
+    "args": ["-p", "$ZED_DIRNAME", "compileJava", "compileTestJava"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]

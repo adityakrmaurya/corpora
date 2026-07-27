@@ -1,0 +1,38 @@
+# C4 Model — Level 1: System Context
+
+Who uses Corpora, and what external systems it depends on. See `docs/architecture/c4-container.md` for the internal service breakdown.
+
+```mermaid
+C4Context
+    title System Context — Corpora Enterprise Document RAG
+
+    Person(endUser, "Knowledge Worker", "Uploads documents and asks questions against the corpus")
+    Person(admin, "Corpus Administrator", "Manages corpora, document ACLs, and tenant/routing policy")
+    Person(complianceOfficer, "Compliance / Audit Officer", "Reviews the audit trail: who accessed what, and why")
+
+    System(corpora, "Corpora", "Self-hosted enterprise document RAG platform — ingest, index, and chat over documents with per-document access control")
+
+    System_Ext(idp, "Keycloak", "Existing/self-hosted OIDC Identity Provider — source of truth for users, groups, tenants")
+    System_Ext(llmProviders, "LLM / Embedding Providers", "Ollama (self-hosted default) or opt-in Azure OpenAI / AWS Bedrock / Anthropic")
+    System_Ext(doclingServe, "Docling Serve", "Vendored document-understanding engine (layout, tables, chunking) — official container, not owned code")
+    System_Ext(objectStorage, "MinIO", "Self-hosted S3-compatible object storage for raw documents and large intermediate artifacts")
+    System_Ext(observability, "Observability Stack", "Self-hosted Prometheus / Grafana / Tempo / Loki — receives metrics, logs, traces")
+
+    Rel(endUser, corpora, "Uploads documents, asks questions", "HTTPS")
+    Rel(admin, corpora, "Manages corpora, ACLs, routing policy", "HTTPS")
+    Rel(complianceOfficer, corpora, "Queries audit trail", "HTTPS")
+
+    Rel(corpora, idp, "Validates JWTs, resolves tenant/group claims", "OIDC/JWKS")
+    Rel(corpora, llmProviders, "Chat completion + embedding calls", "REST (provider-specific)")
+    Rel(corpora, doclingServe, "Document conversion + chunking", "REST (docling-serve-client)")
+    Rel(corpora, objectStorage, "Raw upload + artifact storage", "S3 API")
+    Rel(corpora, observability, "Metrics / logs / traces", "OTLP")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+```
+
+## Notes
+
+- **Corpora** is the one system box in this diagram; its internal decomposition into 14 services is Level 2 (`c4-container.md`).
+- Keycloak is treated as an **existing external system**, not something Corpora operates as application logic — see ADR-0005 for why a separate "Authentication Service" was rejected in favor of Keycloak + a narrower Authorization & Identity-Context Service.
+- Docling Serve, Ollama, MinIO, and the observability stack are all self-hosted but modeled as external systems from Corpora's own bounded-context perspective — see ADR-0006 and ADR-0014 for why a vendored container is not the same as owned polyglot code.

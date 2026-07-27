@@ -1,0 +1,56 @@
+{
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/.gradle",
+    "**/build",
+    "**/out",
+    "**/.idea",
+    "**/*.class"
+  ],
+  "lsp": {
+    "jdtls": {
+      "settings": {
+        "lombok_support": true,
+        "initialization_options": {
+          "settings": {
+            "java": {
+              "configuration": {
+                "updateBuildConfiguration": "automatic"
+              },
+              "import": {
+                "gradle": {
+                  "enabled": true
+                },
+                "maven": {
+                  "enabled": false
+                }
+              },
+              "format": {
+                "enabled": true,
+                "settings": {
+                  "url": "config/formatter/eclipse-java-google-style.xml",
+                  "profile": "GoogleStyle"
+                }
+              },
+              "saveActions": {
+                "organizeImports": true
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "languages": {
+    "Java": {
+      "format_on_save": "on",
+      "formatter": "language_server",
+      "tab_size": 2
+    },
+    "Kotlin": {
+      "format_on_save": "on",
+      "formatter": "language_server",
+      "tab_size": 4
+    }
+  }
+}

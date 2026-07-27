@@ -2,32 +2,10 @@
 
 Owns the single highest-risk piece of logic in the system: ACL enforcement at query time. Bounded context: `CandidateSet` — see ADR-0003, ADR-0012.
 
-```mermaid
-C4Component
-    title Component Diagram — Retrieval Service
+![Component Diagram — Retrieval Service](diagrams/c4-component-retrieval-service.svg)
 
-    Container_Boundary(retrieval, "Retrieval Service") {
-        Component(findCandidates, "FindCandidatesEndpoint", "gRPC unary", "Entry point from Query Processor")
-        Component(queryEmbedder, "QueryEmbedder", "Spring AI EmbeddingModel", "Turns rewritten_query_text into a vector using the currently active embedding provider")
-        Component(aclFilterBuilder, "AccessControlFilterExpressionBuilder", "Domain service — HIGHEST RISK LOGIC", "Builds the mandatory Spring AI Filter.Expression from trusted tenant_id/acl_groups gRPC metadata: tenant_id == ':t' AND (acl_groups in [...] OR owner == ':sub')")
-        Component(hintMerger, "UserHintMerger", "Domain service", "ANDs the untrusted ExtractedFilterHint onto the ACL expression — can only narrow, structurally cannot widen past it")
-        Component(similaritySearch, "SimilaritySearchService", "PgVectorStore.similaritySearch", "Executes the ANN query with the combined Filter.Expression")
-        ComponentDb(pgvectorReader, "PGVector (read-only)", "embedding-db (ADR-0012)", "This service NEVER writes here — Embedding Service is the sole writer, this is the one deliberate cross-instance connection in the system")
-        Component(auditPublisher, "AsyncAuditPublisher", "Kafka producer, fire-and-forget", "Publishes ChunksRetrieved — never blocks the response, mirrors Query Processor's own AsyncAuditPublisher")
-    }
-
-    Container(ollama, "Ollama / active embedding provider")
-    ContainerQueue(kafka, "Kafka")
-
-    Rel(findCandidates, queryEmbedder, "1. embed query")
-    Rel(queryEmbedder, ollama, "gRPC/REST per active provider")
-    Rel(findCandidates, aclFilterBuilder, "2. build mandatory ACL filter")
-    Rel(aclFilterBuilder, hintMerger, "3. AND-merge user's narrowing hint")
-    Rel(hintMerger, similaritySearch, "4. execute filtered search")
-    Rel(similaritySearch, pgvectorReader, "SELECT ... WHERE filter (read-only)")
-    Rel(similaritySearch, auditPublisher, "5. fire-and-forget, alongside returning candidates")
-    Rel(auditPublisher, kafka, "publish ChunksRetrieved")
-```
+> Diagram source: [`diagrams/c4-component-retrieval-service.mmd`](diagrams/c4-component-retrieval-service.mmd) (Mermaid C4 syntax). GitHub's Mermaid renderer doesn't support C4 diagrams, so this is pre-rendered to SVG. After editing the source, regenerate with:
+> `npx --yes @mermaid-js/mermaid-cli -i diagrams/c4-component-retrieval-service.mmd -o diagrams/c4-component-retrieval-service.svg -b white`
 
 ## Notes
 

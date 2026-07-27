@@ -2,42 +2,10 @@
 
 Read-side orchestrator. Bounded context: `AnswerRequest` — see ADR-0002 for why this chain is synchronous gRPC, not event-driven.
 
-```mermaid
-C4Component
-    title Component Diagram — Query Processor Service
+![Component Diagram — Query Processor Service](diagrams/c4-component-query-processor-service.svg)
 
-    Container_Boundary(qp, "Query Processor Service") {
-        Component(chatEntrypoint, "ChatStreamEndpoint", "gRPC server-streaming", "Entry point from the Gateway; receives RawQuery, returns a stream of AnswerEvent")
-        Component(rewriter, "QueryRewriter", "Domain service", "Pronoun/ellipsis resolution against ConversationContext, typo correction, multi-part decomposition into a RetrievalPlan")
-        Component(intentClassifier, "IntentClassifier", "Domain service", "factual QA vs summarization vs comparison — affects top_k, rerank aggressiveness, prompt template")
-        Component(filterHintExtractor, "FilterHintExtractor", "Domain service", "Parses user-stated constraints into ExtractedFilterHint — explicitly untrusted, narrows only")
-        Component(orchestrator, "AnswerOrchestrator", "Saga-style coordinator", "Owns the AnswerRequest aggregate + the total gRPC deadline budget across every downstream call")
-        Component(deadlineManager, "DeadlineManager", "gRPC Context deadline propagation", "Sets/propagates the total latency budget; enables deterministic cutoffs (e.g. skip rerank under time pressure)")
-        Component(retrievalClient, "RetrievalClient", "gRPC stub")
-        Component(rerankerClient, "RerankerClient", "gRPC stub")
-        Component(formatterClient, "ResponseFormatterClient", "gRPC bidi stub")
-        Component(auditPublisher, "AsyncAuditPublisher", "Kafka producer, fire-and-forget", "QueryReceived/QueryRewritten/QueryAnswered — never blocks the response")
-    }
-
-    Container(retrieval, "Retrieval Service")
-    Container(reranker, "Reranker Service")
-    Container(responseFormatter, "Response Formatter Service")
-    ContainerQueue(kafka, "Kafka")
-
-    Rel(chatEntrypoint, rewriter, "1. rewrite")
-    Rel(chatEntrypoint, intentClassifier, "2. classify intent")
-    Rel(chatEntrypoint, filterHintExtractor, "3. extract filter hints")
-    Rel(chatEntrypoint, orchestrator, "4. orchestrate")
-    Rel(orchestrator, deadlineManager, "enforces budget across all calls")
-    Rel(orchestrator, retrievalClient, "FindCandidates (unary)")
-    Rel(retrievalClient, retrieval, "gRPC")
-    Rel(orchestrator, rerankerClient, "Rerank (unary)")
-    Rel(rerankerClient, reranker, "gRPC")
-    Rel(orchestrator, formatterClient, "FormatStream (bidi) — relays reranked context + LLM tokens")
-    Rel(formatterClient, responseFormatter, "gRPC")
-    Rel(chatEntrypoint, auditPublisher, "fire-and-forget, after/alongside response")
-    Rel(auditPublisher, kafka, "publish read-side audit events")
-```
+> Diagram source: [`diagrams/c4-component-query-processor-service.mmd`](diagrams/c4-component-query-processor-service.mmd) (Mermaid C4 syntax). GitHub's Mermaid renderer doesn't support C4 diagrams, so this is pre-rendered to SVG. After editing the source, regenerate with:
+> `npx --yes @mermaid-js/mermaid-cli -i diagrams/c4-component-query-processor-service.mmd -o diagrams/c4-component-query-processor-service.svg -b white`
 
 ## Notes
 

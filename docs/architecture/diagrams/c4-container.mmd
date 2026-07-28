@@ -1,96 +1,111 @@
-C4Container
-    title Container Diagram — Corpora
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+    "fontSize": "14px",
+    "primaryColor": "#0d9488",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#0f766e",
+    "lineColor": "#94a3b8",
+    "secondaryColor": "#e2e8f0"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 35,
+    "rankSpacing": 70,
+    "wrappingWidth": 220,
+    "padding": 10,
+    "diagramPadding": 24
+  },
+  "htmlLabels": true
+}}%%
+flowchart TB
+  user(["<b>Knowledge Worker / Admin</b><br/><i>Person</i>"])
+  gateway["<b>API Gateway</b><br/><i>Spring Cloud Gateway</i><br/>Edge JWT validation, routing, rate limiting"]
 
-    Person(user, "Knowledge Worker / Admin")
+  authz["<b>Authorization &amp; Identity-Context</b><br/><i>Spring Boot / gRPC</i><br/><i>own Postgres instance</i>"]
+  validator["<b>Request Validator</b><br/><i>Spring Boot / gRPC</i><br/><i>own Postgres instance</i>"]
+  ingestion["<b>Ingestion Service</b><br/><i>Spring Boot / WebFlux</i><br/><i>own Postgres instance</i>"]
+  parsing["<b>Parsing Service</b><br/><i>Spring Boot</i><br/><i>own Postgres instance</i>"]
+  chunking["<b>Chunking Service</b><br/><i>Spring Boot</i><br/><i>own Postgres instance</i>"]
+  embedding["<b>Embedding Service</b><br/><i>Spring Boot / Spring AI</i>"]
+  catalog["<b>Document Catalog &amp; Lifecycle</b><br/><i>Spring Boot</i><br/><i>own Postgres instance</i>"]
+  audit["<b>Audit Service</b><br/><i>Spring Boot</i><br/><i>own Postgres instance</i>"]
 
-    System_Boundary(corpora, "Corpora") {
-        Container(gateway, "API Gateway", "Spring Cloud Gateway (Reactor/Netty)", "Edge JWT validation, routing, CORS, rate limiting, SSE-to-gRPC translation")
+  pgEmbedding[("embedding-db<br/><i>PostgreSQL + pgvector</i>")]
 
-        Boundary(writeSide, "Write Side (async, Kafka)") {
-            Container(authz, "Authorization & Identity-Context Service", "Spring Boot / gRPC", "Fine-grained resource authz, AccessGranted/Denied events")
-            Container(validator, "Request Validator Service", "Spring Boot / gRPC", "Quota, mime allow-list, malware scan, dedup policy gate")
-            Container(ingestion, "Ingestion Service", "Spring Boot / WebFlux", "Streamed upload, Upload aggregate, DocumentUploaded event")
-            Container(parsing, "Parsing Service", "Spring Boot", "Calls Docling Serve /convert; DocumentParsed event")
-            Container(chunking, "Chunking Service", "Spring Boot", "Calls Docling Serve /chunk (HybridChunker); ChunkCreated/DocumentChunked events")
-            Container(embedding, "Embedding Service", "Spring Boot / Spring AI", "Computes embeddings, writes PGVector; ChunkEmbedded/DocumentEmbeddingCompleted")
-            Container(catalog, "Document Catalog & Lifecycle Service", "Spring Boot", "Document current-state projection, deletion saga")
-            Container(audit, "Audit Service", "Spring Boot", "Append-only compliance log, pure Kafka consumer")
-        }
+  kafka{{"<b>Kafka</b><br/><i>KRaft</i>"}}
+  minio[("<b>MinIO</b><br/><i>Object Storage</i>")]
 
-        Boundary(readSide, "Read Side (sync, gRPC)") {
-            Container(queryProcessor, "Query Processor Service", "Spring Boot / gRPC", "Query rewriting, chain orchestration, latency-budget owner")
-            Container(retrieval, "Retrieval Service", "Spring Boot / Spring AI / gRPC", "Query embedding + PGVector search + ACL Filter.Expression")
-            Container(reranker, "Reranker Service", "Spring Boot / DJL / gRPC", "Cross-encoder rerank + MMR diversity filter")
-            Container(llmRouter, "LLM Router Service", "Spring Boot / Spring AI / gRPC", "Tenant-tier/capability/fallback model routing policy")
-            Container(responseFormatter, "Response Formatter Service", "Spring Boot / gRPC", "Citation assembly, SSE event shaping")
-        }
+  queryProcessor["<b>Query Processor</b><br/><i>Spring Boot / gRPC</i>"]
+  retrieval["<b>Retrieval Service</b><br/><i>Spring AI / gRPC</i>"]
+  reranker["<b>Reranker Service</b><br/><i>DJL / gRPC</i>"]
+  responseFormatter["<b>Response Formatter</b><br/><i>Spring Boot / gRPC</i>"]
+  llmRouter["<b>LLM Router</b><br/><i>Spring AI / gRPC</i><br/><i>own Postgres instance</i>"]
 
-        Boundary(dataStores, "Data Stores (one dedicated Postgres instance per data-owning service — ADR-0012)") {
-            ContainerDb(pgAuthz, "authorization-db", "PostgreSQL", "Policy/ACL data")
-            ContainerDb(pgValidator, "request-validator-db", "PostgreSQL", "Validation-rule config")
-            ContainerDb(pgIngestion, "ingestion-db", "PostgreSQL", "Submission/staging bookkeeping")
-            ContainerDb(pgParsing, "parsing-db", "PostgreSQL", "Parse-job bookkeeping")
-            ContainerDb(pgChunking, "chunking-db", "PostgreSQL", "ChunkSet/Chunk entities")
-            ContainerDb(pgEmbedding, "embedding-db", "PostgreSQL + pgvector", "ChunkEmbedding bookkeeping + the shared PGVector index")
-            ContainerDb(pgCatalog, "document-catalog-db", "PostgreSQL", "Document lifecycle projection")
-            ContainerDb(pgAudit, "audit-db", "PostgreSQL", "Append-only compliance log")
-            ContainerDb(pgLlmRouter, "llm-router-db", "PostgreSQL", "Routing policy + circuit-breaker state")
-        }
+  keycloak["<b>Keycloak</b><br/><i>External System</i>"]
+  ollama["<b>Ollama / Cloud LLMs</b><br/><i>External System</i>"]
+  doclingServe["<b>Docling Serve</b><br/><i>External System</i>"]
+  otel["<b>Observability Stack</b><br/><i>External System</i>"]
 
-        ContainerQueue(kafka, "Kafka", "Apache Kafka (KRaft)", "Write-side domain event backbone (ADR-0007)")
-        ContainerDb(minio, "MinIO", "S3-compatible", "Raw uploads + claim-check payloads")
-    }
+  user --> gateway
+  gateway -->|"upload"| ingestion
+  gateway -->|"status/list/delete"| catalog
+  gateway -->|"chat"| queryProcessor
+  gateway -->|"JWKS"| keycloak
 
-    System_Ext(keycloak, "Keycloak", "OIDC Identity Provider")
-    System_Ext(ollama, "Ollama / Cloud LLM Providers", "Chat + embedding models")
-    System_Ext(doclingServe, "Docling Serve", "Document parsing/chunking engine")
-    System_Ext(otel, "Observability Stack", "Prometheus / Grafana / Tempo / Loki")
+  ingestion --> validator
+  ingestion --> authz
+  catalog --> authz
 
-    Rel(user, gateway, "HTTPS/SSE")
-    Rel(gateway, ingestion, "REST", "upload")
-    Rel(gateway, catalog, "REST", "status/list/delete")
-    Rel(gateway, queryProcessor, "gRPC server-stream, translated to SSE", "chat")
-    Rel(gateway, keycloak, "JWKS validation")
+  ingestion --> kafka
+  validator --> kafka
+  parsing --> kafka
+  chunking --> kafka
+  embedding --> kafka
+  catalog --> kafka
+  audit --> kafka
 
-    Rel(ingestion, validator, "gRPC")
-    Rel(ingestion, authz, "gRPC")
-    Rel(catalog, authz, "gRPC")
+  kafka ~~~ parsing
+  kafka ~~~ chunking
+  kafka ~~~ embedding
+  kafka ~~~ audit
 
-    Rel(ingestion, kafka, "publish DocumentUploaded")
-    Rel(validator, kafka, "publish DocumentUploadRejected")
-    Rel(parsing, kafka, "consume/publish")
-    Rel(chunking, kafka, "consume/publish")
-    Rel(embedding, kafka, "consume/publish")
-    Rel(catalog, kafka, "consume (all lifecycle events) / publish (deletion saga)")
-    Rel(audit, kafka, "consume (enumerated topics, reviewed on addition — ADR-0011)")
+  parsing -->|"convert"| doclingServe
+  chunking -->|"chunk"| doclingServe
+  embedding -->|"embed"| ollama
+  embedding --> pgEmbedding
 
-    Rel(parsing, doclingServe, "convert", "docling-serve-client")
-    Rel(chunking, doclingServe, "chunk", "docling-serve-client")
-    Rel(embedding, ollama, "embed")
-    Rel(embedding, pgEmbedding, "write vectors + bookkeeping", "PGVector + Postgres")
+  ingestion --> minio
+  parsing --> minio
+  chunking --> minio
 
-    Rel(queryProcessor, retrieval, "gRPC unary")
-    Rel(queryProcessor, reranker, "gRPC unary")
-    Rel(queryProcessor, responseFormatter, "gRPC bidi")
-    Rel(responseFormatter, llmRouter, "gRPC server-stream")
-    Rel(retrieval, pgEmbedding, "read vectors (read-only, cross-service)", "PGVector")
-    Rel(retrieval, ollama, "embed query")
-    Rel(retrieval, kafka, "publish ChunksRetrieved (async audit)")
-    Rel(llmRouter, ollama, "chat completion")
+  queryProcessor --> retrieval
+  queryProcessor --> reranker
+  queryProcessor --> responseFormatter
+  responseFormatter --> llmRouter
+  retrieval ==>|"read-only (cross-service exception)"| pgEmbedding
+  retrieval -->|"embed query"| ollama
+  llmRouter -->|"chat completion"| ollama
 
-    Rel(ingestion, minio, "stream upload")
-    Rel(parsing, minio, "read source / write DoclingDocument")
-    Rel(chunking, minio, "read source")
+  gateway --> otel
+  ingestion --> otel
+  queryProcessor --> otel
 
-    Rel(authz, pgAuthz, "policy data")
-    Rel(validator, pgValidator, "config data")
-    Rel(ingestion, pgIngestion, "submission bookkeeping")
-    Rel(parsing, pgParsing, "job bookkeeping")
-    Rel(chunking, pgChunking, "ChunkSet/Chunk entities")
-    Rel(catalog, pgCatalog, "Document projection")
-    Rel(audit, pgAudit, "append-only log")
-    Rel(llmRouter, pgLlmRouter, "routing policy/circuit-breaker state")
+  classDef person fill:#1e3a5f,stroke:#0f2942,color:#ffffff
+  classDef gateway fill:#1e293b,stroke:#0f172a,color:#ffffff
+  classDef writeSvc fill:#0d9488,stroke:#0f766e,color:#ffffff
+  classDef readSvc fill:#7c3aed,stroke:#6d28d9,color:#ffffff
+  classDef db fill:#334155,stroke:#1e293b,color:#ffffff
+  classDef queue fill:#ea580c,stroke:#c2410c,color:#ffffff
+  classDef external fill:#64748b,stroke:#475569,color:#ffffff
 
-    Rel(gateway, otel, "traces/metrics")
-    Rel(ingestion, otel, "traces/metrics")
-    Rel(queryProcessor, otel, "traces/metrics")
+  class user person
+  class gateway gateway
+  class authz,validator,ingestion,parsing,chunking,embedding,catalog,audit writeSvc
+  class queryProcessor,retrieval,reranker,responseFormatter,llmRouter readSvc
+  class pgEmbedding,minio db
+  class kafka queue
+  class keycloak,ollama,doclingServe,otel external
+
+  linkStyle default color:#1e293b,font-weight:500;

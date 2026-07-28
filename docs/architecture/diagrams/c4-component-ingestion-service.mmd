@@ -1,28 +1,60 @@
-C4Component
-    title Component Diagram — Ingestion Service
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+    "fontSize": "14px",
+    "primaryColor": "#0d9488",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#0f766e",
+    "lineColor": "#94a3b8",
+    "secondaryColor": "#e2e8f0"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 35,
+    "rankSpacing": 65,
+    "padding": 10,
+    "diagramPadding": 20
+  },
+  "htmlLabels": true
+}}%%
+flowchart TB
+  uploadController["<b>UploadController</b><br/><i>Spring WebFlux Controller</i><br/>Reactive multipart upload, streams to MinIO without buffering"]
+  validatorClient["<b>RequestValidatorClient</b><br/><i>gRPC stub</i>"]
+  authzClient["<b>AuthorizationClient</b><br/><i>gRPC stub</i>"]
+  uploadService["<b>UploadService</b><br/><i>Domain service</i><br/>Owns the Upload aggregate"]
+  outbox["<b>TransactionalOutbox</b><br/><i>Spring Data JPA + poller</i>"]
+  kafkaProducer["<b>DocumentUploadedProducer</b><br/><i>spring-kafka</i>"]
+  ingestionSchema[("ingestion-db<br/><i>dedicated Postgres instance</i>")]
 
-    Container_Boundary(ingestion, "Ingestion Service") {
-        Component(uploadController, "UploadController", "Spring WebFlux Controller", "Accepts reactive multipart upload (a Flux of PartEvent/FilePartEvent), streams to MinIO without buffering the whole file")
-        Component(validatorClient, "RequestValidatorClient", "gRPC stub", "Synchronous pre-commit policy check (quota/mime/malware/dedup)")
-        Component(authzClient, "AuthorizationClient", "gRPC stub", "Synchronous fine-grained authz check (can this principal upload to this corpus)")
-        Component(uploadService, "UploadService", "Domain service", "Owns the Upload aggregate: stages bytes, mints documentId, transitions PENDING->UPLOADED")
-        Component(outbox, "TransactionalOutbox", "Spring Data JPA + poller", "Writes DocumentUploaded in the same DB transaction as the Upload row; relays to Kafka")
-        Component(kafkaProducer, "DocumentUploadedProducer", "spring-kafka", "Publishes DocumentUploaded (partition key: documentId)")
-        ComponentDb(ingestionSchema, "ingestion-db", "Dedicated Postgres instance (ADR-0012)", "Submission/staging bookkeeping only — no parsed content, no chunks")
-    }
+  minio["<b>MinIO</b><br/><i>Object Storage</i>"]
+  validatorSvc["<b>Request Validator Service</b><br/><i>Container</i>"]
+  authzSvc["<b>Authorization &amp; Identity-Context</b><br/><i>Container</i>"]
+  kafka{{"<b>Kafka</b><br/><i>document.uploaded.v1</i>"}}
 
-    Container(minio, "MinIO", "Object Storage")
-    Container(validatorSvc, "Request Validator Service")
-    Container(authzSvc, "Authorization & Identity-Context Service")
-    ContainerQueue(kafka, "Kafka")
+  uploadController -->|"stream raw bytes (S3 API)"| minio
+  uploadController -->|"validate before commit"| validatorClient
+  validatorClient -->|"gRPC"| validatorSvc
+  uploadController -->|"authorize upload"| authzClient
+  authzClient -->|"gRPC"| authzSvc
+  uploadController -->|"on success"| uploadService
+  uploadService --> ingestionSchema
+  uploadService -->|"same-transaction event write"| outbox
+  outbox -->|"relay"| kafkaProducer
+  kafkaProducer -->|"publish"| kafka
 
-    Rel(uploadController, minio, "stream raw bytes", "S3 API, non-blocking")
-    Rel(uploadController, validatorClient, "validate before commit")
-    Rel(validatorClient, validatorSvc, "gRPC")
-    Rel(uploadController, authzClient, "authorize upload")
-    Rel(authzClient, authzSvc, "gRPC")
-    Rel(uploadController, uploadService, "on validation+authz success")
-    Rel(uploadService, ingestionSchema, "persist Upload row")
-    Rel(uploadService, outbox, "same-transaction event write")
-    Rel(outbox, kafkaProducer, "relay")
-    Rel(kafkaProducer, kafka, "publish document.uploaded.v1")
+  classDef entrypoint fill:#1e293b,stroke:#0f172a,color:#ffffff
+  classDef domain fill:#0d9488,stroke:#0f766e,color:#ffffff
+  classDef stub fill:#5eead4,stroke:#0f766e,color:#0f172a,stroke-dasharray:3 2
+  classDef db fill:#334155,stroke:#1e293b,color:#ffffff
+  classDef queue fill:#ea580c,stroke:#c2410c,color:#ffffff
+  classDef external fill:#64748b,stroke:#475569,color:#ffffff
+
+  class uploadController entrypoint
+  class uploadService,outbox,kafkaProducer domain
+  class validatorClient,authzClient stub
+  class ingestionSchema db
+  class kafka queue
+  class minio,validatorSvc,authzSvc external
+
+  linkStyle default color:#1e293b,font-weight:500;

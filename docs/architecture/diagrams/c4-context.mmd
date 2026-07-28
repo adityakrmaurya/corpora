@@ -1,26 +1,51 @@
-C4Context
-    title System Context — Corpora Enterprise Document RAG
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+    "fontSize": "15px",
+    "primaryColor": "#2563eb",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#1d4ed8",
+    "lineColor": "#64748b",
+    "secondaryColor": "#e2e8f0"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 45,
+    "rankSpacing": 80,
+    "padding": 14
+  },
+  "htmlLabels": true
+}}%%
+flowchart TB
+  endUser(["<b>Knowledge Worker</b><br/><i>Person</i><br/>Uploads documents and asks questions against the corpus"])
+  admin(["<b>Corpus Administrator</b><br/><i>Person</i><br/>Manages corpora, document ACLs, and tenant/routing policy"])
+  complianceOfficer(["<b>Compliance / Audit Officer</b><br/><i>Person</i><br/>Reviews the audit trail: who accessed what, and why"])
 
-    Person(endUser, "Knowledge Worker", "Uploads documents and asks questions against the corpus")
-    Person(admin, "Corpus Administrator", "Manages corpora, document ACLs, and tenant/routing policy")
-    Person(complianceOfficer, "Compliance / Audit Officer", "Reviews the audit trail: who accessed what, and why")
+  corpora["<b>Corpora</b><br/><i>Software System</i><br/>Self-hosted enterprise document RAG platform — ingest, index, and chat over documents with per-document access control"]
 
-    System(corpora, "Corpora", "Self-hosted enterprise document RAG platform — ingest, index, and chat over documents with per-document access control")
+  idp["<b>Keycloak</b><br/><i>OIDC Identity Provider</i><br/>Source of truth for users, groups, tenants"]
+  llmProviders["<b>LLM / Embedding Providers</b><br/><i>External System</i><br/>Ollama (self-hosted default) or opt-in Azure OpenAI / AWS Bedrock / Anthropic"]
+  doclingServe["<b>Docling Serve</b><br/><i>External System</i><br/>Vendored document-understanding engine — official container, not owned code"]
+  objectStorage["<b>MinIO</b><br/><i>External System</i><br/>Self-hosted S3-compatible object storage"]
+  observability["<b>Observability Stack</b><br/><i>External System</i><br/>Prometheus / Grafana / Tempo / Loki"]
 
-    System_Ext(idp, "Keycloak", "Existing/self-hosted OIDC Identity Provider — source of truth for users, groups, tenants")
-    System_Ext(llmProviders, "LLM / Embedding Providers", "Ollama (self-hosted default) or opt-in Azure OpenAI / AWS Bedrock / Anthropic")
-    System_Ext(doclingServe, "Docling Serve", "Vendored document-understanding engine (layout, tables, chunking) — official container, not owned code")
-    System_Ext(objectStorage, "MinIO", "Self-hosted S3-compatible object storage for raw documents and large intermediate artifacts")
-    System_Ext(observability, "Observability Stack", "Self-hosted Prometheus / Grafana / Tempo / Loki — receives metrics, logs, traces")
+  endUser -->|"Uploads docs, asks questions (HTTPS)"| corpora
+  admin -->|"Manages corpora, ACLs, routing policy (HTTPS)"| corpora
+  complianceOfficer -->|"Queries audit trail (HTTPS)"| corpora
 
-    Rel(endUser, corpora, "Uploads documents, asks questions", "HTTPS")
-    Rel(admin, corpora, "Manages corpora, ACLs, routing policy", "HTTPS")
-    Rel(complianceOfficer, corpora, "Queries audit trail", "HTTPS")
+  corpora -->|"Validates JWTs, resolves claims (OIDC/JWKS)"| idp
+  corpora -->|"Chat + embedding calls (REST)"| llmProviders
+  corpora -->|"Document conversion + chunking (REST)"| doclingServe
+  corpora -->|"Raw upload + artifact storage (S3 API)"| objectStorage
+  corpora -->|"Metrics / logs / traces (OTLP)"| observability
 
-    Rel(corpora, idp, "Validates JWTs, resolves tenant/group claims", "OIDC/JWKS")
-    Rel(corpora, llmProviders, "Chat completion + embedding calls", "REST (provider-specific)")
-    Rel(corpora, doclingServe, "Document conversion + chunking", "REST (docling-serve-client)")
-    Rel(corpora, objectStorage, "Raw upload + artifact storage", "S3 API")
-    Rel(corpora, observability, "Metrics / logs / traces", "OTLP")
+  classDef person fill:#1e3a5f,stroke:#0f2942,color:#ffffff
+  classDef system fill:#2563eb,stroke:#1d4ed8,color:#ffffff
+  classDef external fill:#64748b,stroke:#475569,color:#ffffff
 
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+  class endUser,admin,complianceOfficer person
+  class corpora system
+  class idp,llmProviders,doclingServe,objectStorage,observability external
+
+  linkStyle default color:#1e293b,font-weight:500;

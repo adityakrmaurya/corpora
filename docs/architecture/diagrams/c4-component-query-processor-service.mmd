@@ -1,34 +1,68 @@
-C4Component
-    title Component Diagram — Query Processor Service
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+    "fontSize": "14px",
+    "primaryColor": "#7c3aed",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#6d28d9",
+    "lineColor": "#94a3b8",
+    "secondaryColor": "#e2e8f0"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 32,
+    "rankSpacing": 65,
+    "padding": 10,
+    "diagramPadding": 20
+  },
+  "htmlLabels": true
+}}%%
+flowchart TB
+  chatEntrypoint["<b>ChatStreamEndpoint</b><br/><i>gRPC server-streaming</i><br/>Entry point from the Gateway"]
+  rewriter["<b>QueryRewriter</b><br/><i>Domain service</i><br/>Pronoun/ellipsis resolution, decomposition"]
+  intentClassifier["<b>IntentClassifier</b><br/><i>Domain service</i><br/>factual vs summarization vs comparison"]
+  filterHintExtractor["<b>FilterHintExtractor</b><br/><i>Domain service</i><br/>Untrusted, narrows only"]
+  orchestrator["<b>AnswerOrchestrator</b><br/><i>Saga-style coordinator</i><br/>Owns the total gRPC deadline budget"]
+  deadlineManager["<b>DeadlineManager</b><br/><i>gRPC deadline propagation</i>"]
+  retrievalClient["<b>RetrievalClient</b><br/><i>gRPC stub</i>"]
+  rerankerClient["<b>RerankerClient</b><br/><i>gRPC stub</i>"]
+  formatterClient["<b>ResponseFormatterClient</b><br/><i>gRPC bidi stub</i>"]
+  auditPublisher["<b>AsyncAuditPublisher</b><br/><i>Kafka producer, fire-and-forget</i><br/>Never blocks the response"]
 
-    Container_Boundary(qp, "Query Processor Service") {
-        Component(chatEntrypoint, "ChatStreamEndpoint", "gRPC server-streaming", "Entry point from the Gateway; receives RawQuery, returns a stream of AnswerEvent")
-        Component(rewriter, "QueryRewriter", "Domain service", "Pronoun/ellipsis resolution against ConversationContext, typo correction, multi-part decomposition into a RetrievalPlan")
-        Component(intentClassifier, "IntentClassifier", "Domain service", "factual QA vs summarization vs comparison — affects top_k, rerank aggressiveness, prompt template")
-        Component(filterHintExtractor, "FilterHintExtractor", "Domain service", "Parses user-stated constraints into ExtractedFilterHint — explicitly untrusted, narrows only")
-        Component(orchestrator, "AnswerOrchestrator", "Saga-style coordinator", "Owns the AnswerRequest aggregate + the total gRPC deadline budget across every downstream call")
-        Component(deadlineManager, "DeadlineManager", "gRPC Context deadline propagation", "Sets/propagates the total latency budget; enables deterministic cutoffs (e.g. skip rerank under time pressure)")
-        Component(retrievalClient, "RetrievalClient", "gRPC stub")
-        Component(rerankerClient, "RerankerClient", "gRPC stub")
-        Component(formatterClient, "ResponseFormatterClient", "gRPC bidi stub")
-        Component(auditPublisher, "AsyncAuditPublisher", "Kafka producer, fire-and-forget", "QueryReceived/QueryRewritten/QueryAnswered — never blocks the response")
-    }
+  retrieval["<b>Retrieval Service</b><br/><i>Container</i>"]
+  reranker["<b>Reranker Service</b><br/><i>Container</i>"]
+  responseFormatter["<b>Response Formatter</b><br/><i>Container</i>"]
+  kafka{{"<b>Kafka</b><br/><i>read-side audit events</i>"}}
 
-    Container(retrieval, "Retrieval Service")
-    Container(reranker, "Reranker Service")
-    Container(responseFormatter, "Response Formatter Service")
-    ContainerQueue(kafka, "Kafka")
+  chatEntrypoint -->|"1 . rewrite"| rewriter
+  chatEntrypoint -->|"2 . classify intent"| intentClassifier
+  chatEntrypoint -->|"3 . extract filter hints"| filterHintExtractor
+  chatEntrypoint -->|"4 . orchestrate"| orchestrator
+  chatEntrypoint -.->|"fire-and-forget"| auditPublisher
 
-    Rel(chatEntrypoint, rewriter, "1. rewrite")
-    Rel(chatEntrypoint, intentClassifier, "2. classify intent")
-    Rel(chatEntrypoint, filterHintExtractor, "3. extract filter hints")
-    Rel(chatEntrypoint, orchestrator, "4. orchestrate")
-    Rel(orchestrator, deadlineManager, "enforces budget across all calls")
-    Rel(orchestrator, retrievalClient, "FindCandidates (unary)")
-    Rel(retrievalClient, retrieval, "gRPC")
-    Rel(orchestrator, rerankerClient, "Rerank (unary)")
-    Rel(rerankerClient, reranker, "gRPC")
-    Rel(orchestrator, formatterClient, "FormatStream (bidi) — relays reranked context + LLM tokens")
-    Rel(formatterClient, responseFormatter, "gRPC")
-    Rel(chatEntrypoint, auditPublisher, "fire-and-forget, after/alongside response")
-    Rel(auditPublisher, kafka, "publish read-side audit events")
+  orchestrator -->|"enforces budget"| deadlineManager
+  orchestrator -->|"FindCandidates"| retrievalClient
+  orchestrator -->|"Rerank"| rerankerClient
+  orchestrator -->|"FormatStream (bidi)"| formatterClient
+
+  retrievalClient -->|"gRPC"| retrieval
+  rerankerClient -->|"gRPC"| reranker
+  formatterClient -->|"gRPC"| responseFormatter
+  auditPublisher -->|"publish"| kafka
+
+  classDef entrypoint fill:#1e293b,stroke:#0f172a,color:#ffffff
+  classDef domain fill:#7c3aed,stroke:#6d28d9,color:#ffffff
+  classDef async fill:#7c3aed,stroke:#6d28d9,color:#ffffff,stroke-dasharray:4 3
+  classDef stub fill:#ddd6fe,stroke:#6d28d9,color:#312e81,stroke-dasharray:3 2
+  classDef queue fill:#ea580c,stroke:#c2410c,color:#ffffff
+  classDef external fill:#64748b,stroke:#475569,color:#ffffff
+
+  class chatEntrypoint entrypoint
+  class rewriter,intentClassifier,filterHintExtractor,orchestrator,deadlineManager domain
+  class auditPublisher async
+  class retrievalClient,rerankerClient,formatterClient stub
+  class kafka queue
+  class retrieval,reranker,responseFormatter external
+
+  linkStyle default color:#1e293b,font-weight:500;

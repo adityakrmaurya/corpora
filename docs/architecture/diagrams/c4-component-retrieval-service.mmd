@@ -1,24 +1,58 @@
-C4Component
-    title Component Diagram — Retrieval Service
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif",
+    "fontSize": "14px",
+    "primaryColor": "#7c3aed",
+    "primaryTextColor": "#ffffff",
+    "primaryBorderColor": "#6d28d9",
+    "lineColor": "#94a3b8",
+    "secondaryColor": "#e2e8f0"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "nodeSpacing": 32,
+    "rankSpacing": 65,
+    "padding": 10,
+    "diagramPadding": 20
+  },
+  "htmlLabels": true
+}}%%
+flowchart TB
+  findCandidates["<b>FindCandidatesEndpoint</b><br/><i>gRPC unary</i><br/>Entry point from Query Processor"]
+  queryEmbedder["<b>QueryEmbedder</b><br/><i>Spring AI EmbeddingModel</i>"]
+  aclFilterBuilder["⚠ <b>AccessControlFilterExpressionBuilder</b><br/><i>HIGHEST RISK LOGIC</i><br/>Builds the mandatory ACL Filter.Expression"]
+  hintMerger["<b>UserHintMerger</b><br/><i>Domain service</i><br/>AND-merges the narrowing hint, cannot widen"]
+  similaritySearch["<b>SimilaritySearchService</b><br/><i>PgVectorStore.similaritySearch</i>"]
+  pgvectorReader[("PGVector (read-only)<br/><i>embedding-db</i>")]
+  auditPublisher["<b>AsyncAuditPublisher</b><br/><i>Kafka producer, fire-and-forget</i>"]
 
-    Container_Boundary(retrieval, "Retrieval Service") {
-        Component(findCandidates, "FindCandidatesEndpoint", "gRPC unary", "Entry point from Query Processor")
-        Component(queryEmbedder, "QueryEmbedder", "Spring AI EmbeddingModel", "Turns rewritten_query_text into a vector using the currently active embedding provider")
-        Component(aclFilterBuilder, "AccessControlFilterExpressionBuilder", "Domain service — HIGHEST RISK LOGIC", "Builds the mandatory Spring AI Filter.Expression from trusted tenant_id/acl_groups gRPC metadata: tenant_id == ':t' AND (acl_groups in [...] OR owner == ':sub')")
-        Component(hintMerger, "UserHintMerger", "Domain service", "ANDs the untrusted ExtractedFilterHint onto the ACL expression — can only narrow, structurally cannot widen past it")
-        Component(similaritySearch, "SimilaritySearchService", "PgVectorStore.similaritySearch", "Executes the ANN query with the combined Filter.Expression")
-        ComponentDb(pgvectorReader, "PGVector (read-only)", "embedding-db (ADR-0012)", "This service NEVER writes here — Embedding Service is the sole writer, this is the one deliberate cross-instance connection in the system")
-        Component(auditPublisher, "AsyncAuditPublisher", "Kafka producer, fire-and-forget", "Publishes ChunksRetrieved — never blocks the response, mirrors Query Processor's own AsyncAuditPublisher")
-    }
+  ollama["<b>Ollama / active provider</b><br/><i>Container</i>"]
+  kafka{{"<b>Kafka</b><br/><i>ChunksRetrieved</i>"}}
 
-    Container(ollama, "Ollama / active embedding provider")
-    ContainerQueue(kafka, "Kafka")
+  findCandidates -->|"1 . embed query"| queryEmbedder
+  queryEmbedder -->|"gRPC/REST"| ollama
+  findCandidates -->|"2 . build mandatory ACL filter"| aclFilterBuilder
+  aclFilterBuilder -->|"3 . AND-merge narrowing hint"| hintMerger
+  hintMerger -->|"4 . execute filtered search"| similaritySearch
+  similaritySearch -->|"SELECT ... WHERE filter"| pgvectorReader
+  similaritySearch -.->|"5 . fire-and-forget"| auditPublisher
+  auditPublisher -->|"publish"| kafka
 
-    Rel(findCandidates, queryEmbedder, "1. embed query")
-    Rel(queryEmbedder, ollama, "gRPC/REST per active provider")
-    Rel(findCandidates, aclFilterBuilder, "2. build mandatory ACL filter")
-    Rel(aclFilterBuilder, hintMerger, "3. AND-merge user's narrowing hint")
-    Rel(hintMerger, similaritySearch, "4. execute filtered search")
-    Rel(similaritySearch, pgvectorReader, "SELECT ... WHERE filter (read-only)")
-    Rel(similaritySearch, auditPublisher, "5. fire-and-forget, alongside returning candidates")
-    Rel(auditPublisher, kafka, "publish ChunksRetrieved")
+  classDef entrypoint fill:#1e293b,stroke:#0f172a,color:#ffffff
+  classDef domain fill:#7c3aed,stroke:#6d28d9,color:#ffffff
+  classDef risk fill:#b91c1c,stroke:#7f1d1d,color:#ffffff,stroke-width:2px
+  classDef async fill:#7c3aed,stroke:#6d28d9,color:#ffffff,stroke-dasharray:4 3
+  classDef db fill:#334155,stroke:#1e293b,color:#ffffff
+  classDef queue fill:#ea580c,stroke:#c2410c,color:#ffffff
+  classDef external fill:#64748b,stroke:#475569,color:#ffffff
+
+  class findCandidates entrypoint
+  class queryEmbedder,hintMerger,similaritySearch domain
+  class aclFilterBuilder risk
+  class auditPublisher async
+  class pgvectorReader db
+  class kafka queue
+  class ollama external
+
+  linkStyle default color:#1e293b,font-weight:500;

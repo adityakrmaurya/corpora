@@ -1,0 +1,46 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Dynamic diagram: ask a question (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Read side (gRPC)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        23["<div style='font-weight: bold'>Query Processor Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Orchestrates one question end<br />to end and owns the total<br />deadline budget.</div>"]
+        style 23 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        34["<div style='font-weight: bold'>Retrieval Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Embeds the query and runs an<br />ACL-filtered similarity<br />search over PGVector.</div>"]
+        style 34 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        41["<div style='font-weight: bold'>Reranker Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, DJL, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Re-scores candidate chunks<br />with a cross-encoder and<br />removes near-duplicates with<br />MMR.</div>"]
+        style 41 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        42["<div style='font-weight: bold'>Response Formatter Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Assembles citations and<br />shapes the answer into a<br />typed stream of citations,<br />token, done, and error<br />events.</div>"]
+        style 42 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        43["<div style='font-weight: bold'>LLM Router Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Chooses the chat provider and<br />model per request by tenant<br />tier, capability, and<br />provider health; falls back<br />on failure.</div>"]
+        style 43 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      48["<div style='font-weight: bold'>Ollama</div><div style='font-size: 70%; margin-top: 0px'>[Container: Ollama]</div><div style='font-size: 80%; margin-top:10px'>Default self-hosted chat and<br />embedding model runtime.</div>"]
+      style 48 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      54[("<div style='font-weight: bold'>embedding-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL, pgvector]</div><div style='font-size: 80%; margin-top:10px'>Embedding Service bookkeeping<br />and its outbox, plus the<br />shared PGVector index.<br />Written by Embedding Service<br />only; read by Retrieval<br />Service.</div>")]
+      style 54 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Cloud Gateway]</div><div style='font-size: 80%; margin-top:10px'>Single entry point: TLS<br />termination, edge JWT<br />validation, routing, CORS,<br />rate limiting, correlation-ID<br />injection, SSE-to-gRPC<br />translation for chat.</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    1["<div style='font-weight: bold'>Knowledge Worker</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Uploads documents and asks<br />questions against the corpus.</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+
+    1-- "<div>1. Asks a question</div><div style='font-size: 70%'>[HTTPS]</div>" -->8
+    8-- "<div>2. Forwards the request with<br />trusted tenant and ACL claims</div><div style='font-size: 70%'>[gRPC]</div>" -->23
+    23-- "<div>3. Requests candidate chunks</div><div style='font-size: 70%'>[gRPC]</div>" -->34
+    34-- "<div>4. Embeds the query</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    34-- "<div>5. Runs the ACL-filtered<br />similarity search</div><div style='font-size: 70%'>[JDBC]</div>" -->54
+    23-- "<div>6. Requests reranking</div><div style='font-size: 70%'>[gRPC]</div>" -->41
+    23-- "<div>7. Opens FormatStream with<br />the reranked context</div><div style='font-size: 70%'>[gRPC (bidirectional streaming)]</div>" -->42
+    42-- "<div>8. Requests streamed chat<br />completion</div><div style='font-size: 70%'>[gRPC]</div>" -->43
+    43-- "<div>9. Requests chat completion<br />from the selected provider</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+
+  end

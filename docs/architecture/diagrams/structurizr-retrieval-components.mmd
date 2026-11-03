@@ -1,0 +1,52 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Component diagram for Retrieval Service (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    5["<div style='font-weight: bold'>Cloud LLM Providers</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Opt-in Azure OpenAI, AWS<br />Bedrock, or Anthropic,<br />selected by Spring profile<br />instead of the default<br />Ollama.</div>"]
+    style 5 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph 34 ["Retrieval Service"]
+        style 34 fill:#ffffff,stroke:#2e6295,color:#2e6295
+
+        35["<div style='font-weight: bold'>FindCandidatesEndpoint</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC unary]</div><div style='font-size: 80%; margin-top:10px'>Entry point from Query<br />Processor. Receives trusted<br />tenant and ACL claims as gRPC<br />metadata.</div>"]
+        style 35 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        36["<div style='font-weight: bold'>QueryEmbedder</div><div style='font-size: 70%; margin-top: 0px'>[Component: Spring AI EmbeddingModel]</div><div style='font-size: 80%; margin-top:10px'>Embeds the query with the<br />active embedding provider.</div>"]
+        style 36 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        37["<div style='font-weight: bold'>AccessControlFilterExpressionBuilder</div><div style='font-size: 70%; margin-top: 0px'>[Component: Java]</div><div style='font-size: 80%; margin-top:10px'>Builds the mandatory ACL<br />Filter.Expression from<br />trusted JWT claims.<br />Highest-risk logic in the<br />system.</div>"]
+        style 37 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        38["<div style='font-weight: bold'>UserHintMerger</div><div style='font-size: 70%; margin-top: 0px'>[Component: Domain service]</div><div style='font-size: 80%; margin-top:10px'>AND-merges the untrusted,<br />narrowing-only<br />ExtractedFilterHint into the<br />ACL filter. Cannot widen it.</div>"]
+        style 38 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        39["<div style='font-weight: bold'>SimilaritySearchService</div><div style='font-size: 70%; margin-top: 0px'>[Component: Spring AI PgVectorStore]</div><div style='font-size: 80%; margin-top:10px'>Executes the filtered<br />similarity search.</div>"]
+        style 39 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        40["<div style='font-weight: bold'>AsyncAuditPublisher</div><div style='font-size: 70%; margin-top: 0px'>[Component: spring-kafka, fire-and-forget]</div><div style='font-size: 80%; margin-top:10px'>Publishes ChunksRetrieved<br />without blocking the<br />response.</div>"]
+        style 40 fill:#85bbf0,stroke:#5d82a8,color:#000000
+      end
+
+      23["<div style='font-weight: bold'>Query Processor Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Orchestrates one question end<br />to end and owns the total<br />deadline budget.</div>"]
+      style 23 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      48["<div style='font-weight: bold'>Ollama</div><div style='font-size: 70%; margin-top: 0px'>[Container: Ollama]</div><div style='font-size: 80%; margin-top:10px'>Default self-hosted chat and<br />embedding model runtime.</div>"]
+      style 48 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      54[("<div style='font-weight: bold'>embedding-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL, pgvector]</div><div style='font-size: 80%; margin-top:10px'>Embedding Service bookkeeping<br />and its outbox, plus the<br />shared PGVector index.<br />Written by Embedding Service<br />only; read by Retrieval<br />Service.</div>")]
+      style 54 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    23-. "<div>Publishes QueryReceived,<br />QueryRewritten, and<br />QueryAnswered,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    23-- "<div>Requests candidate chunks<br />from</div><div style='font-size: 70%'>[gRPC]</div>" -->35
+    35-- "<div>1. Embeds the query with</div><div style='font-size: 70%'></div>" -->36
+    35-- "<div>2. Builds the mandatory ACL<br />filter with</div><div style='font-size: 70%'></div>" -->37
+    35-- "<div>Reports ChunksRetrieved to</div><div style='font-size: 70%'></div>" -->40
+    36-- "<div>Requests query embeddings<br />from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    36-- "<div>Requests query embeddings<br />from (opt-in profile)</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    37-- "<div>3. Narrows the filter with<br />the untrusted hint through</div><div style='font-size: 70%'></div>" -->38
+    38-- "<div>4. Executes the filtered<br />search through</div><div style='font-size: 70%'></div>" -->39
+    39-- "<div>Reads vectors with a filtered<br />SELECT from (read-only DB<br />role)</div><div style='font-size: 70%'>[JDBC]</div>" -->54
+    40-. "<div>Publishes ChunksRetrieved,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+
+  end

@@ -1,0 +1,42 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Dynamic diagram: upload a document (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Write side (Kafka events)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        10["<div style='font-weight: bold'>Request Validator Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Applies submission policy to<br />candidate uploads: quota,<br />MIME allow-list, malware scan<br />result, content-hash dedup.</div>"]
+        style 10 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        11["<div style='font-weight: bold'>Ingestion Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, WebFlux]</div><div style='font-size: 80%; margin-top:10px'>Accepts streamed uploads,<br />stages raw bytes in MinIO,<br />mints the documentId, and<br />publishes DocumentUploaded.</div>"]
+        style 11 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        9["<div style='font-weight: bold'>Authorization & Identity-Context Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Decides whether a principal<br />may act on a corpus or<br />document; owns corpus- and<br />document-level grants.</div>"]
+        style 9 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      46["<div style='font-weight: bold'>MinIO</div><div style='font-size: 70%; margin-top: 0px'>[Container: MinIO (S3 API)]</div><div style='font-size: 80%; margin-top:10px'>Object storage for raw<br />uploads, extracted content,<br />and chunk manifests.</div>"]
+      style 46 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      51[("<div style='font-weight: bold'>ingestion-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL]</div><div style='font-size: 80%; margin-top:10px'>Private store of Ingestion<br />Service: Upload aggregate and<br />its outbox.</div>")]
+      style 51 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Cloud Gateway]</div><div style='font-size: 80%; margin-top:10px'>Single entry point: TLS<br />termination, edge JWT<br />validation, routing, CORS,<br />rate limiting, correlation-ID<br />injection, SSE-to-gRPC<br />translation for chat.</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    1["<div style='font-weight: bold'>Knowledge Worker</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Uploads documents and asks<br />questions against the corpus.</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+
+    1-- "<div>1. Uploads a document</div><div style='font-size: 70%'>[HTTPS]</div>" -->8
+    8-- "<div>2. Forwards the upload</div><div style='font-size: 70%'>[HTTP (multipart)]</div>" -->11
+    11-- "<div>3. Streams raw bytes</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    11-- "<div>4. Validates quota, MIME<br />type, malware result, and<br />duplicate hash</div><div style='font-size: 70%'>[gRPC]</div>" -->10
+    11-- "<div>5. Checks upload permission</div><div style='font-size: 70%'>[gRPC]</div>" -->9
+    11-- "<div>6. Writes the Upload and the<br />DocumentUploaded outbox row<br />in one transaction</div><div style='font-size: 70%'>[JDBC]</div>" -->51
+    11-. "<div>7. Relays DocumentUploaded<br />from the outbox</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+
+  end

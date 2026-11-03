@@ -1,0 +1,45 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Container diagram for Corpora: write-side processing dependencies"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    5["<div style='font-weight: bold'>Cloud LLM Providers</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Opt-in Azure OpenAI, AWS<br />Bedrock, or Anthropic,<br />selected by Spring profile<br />instead of the default<br />Ollama.</div>"]
+    style 5 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Write side (Kafka events)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        11["<div style='font-weight: bold'>Ingestion Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, WebFlux]</div><div style='font-size: 80%; margin-top:10px'>Accepts streamed uploads,<br />stages raw bytes in MinIO,<br />mints the documentId, and<br />publishes DocumentUploaded.</div>"]
+        style 11 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        18["<div style='font-weight: bold'>Parsing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Converts documents into<br />structured content (headings,<br />tables, page provenance) via<br />Docling Serve and persists<br />the result.</div>"]
+        style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        19["<div style='font-weight: bold'>Chunking Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Splits documents into<br />retrieval-sized chunks<br />carrying a heading path and<br />source anchor, via Docling<br />Serve.</div>"]
+        style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        20["<div style='font-weight: bold'>Embedding Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI]</div><div style='font-size: 80%; margin-top:10px'>Embeds chunks with the active<br />embedding provider. Sole<br />writer of the PGVector index.</div>"]
+        style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      46["<div style='font-weight: bold'>MinIO</div><div style='font-size: 70%; margin-top: 0px'>[Container: MinIO (S3 API)]</div><div style='font-size: 80%; margin-top:10px'>Object storage for raw<br />uploads, extracted content,<br />and chunk manifests.</div>"]
+      style 46 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      47["<div style='font-weight: bold'>Docling Serve</div><div style='font-size: 70%; margin-top: 0px'>[Container: Docling Serve (Python, vendored image)]</div><div style='font-size: 80%; margin-top:10px'>Vendored<br />document-understanding<br />engine: converts and chunks<br />documents. Official image, no<br />owned code.</div>"]
+      style 47 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      48["<div style='font-weight: bold'>Ollama</div><div style='font-size: 70%; margin-top: 0px'>[Container: Ollama]</div><div style='font-size: 80%; margin-top:10px'>Default self-hosted chat and<br />embedding model runtime.</div>"]
+      style 48 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      54[("<div style='font-weight: bold'>embedding-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL, pgvector]</div><div style='font-size: 80%; margin-top:10px'>Embedding Service bookkeeping<br />and its outbox, plus the<br />shared PGVector index.<br />Written by Embedding Service<br />only; read by Retrieval<br />Service.</div>")]
+      style 54 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    11-- "<div>Streams raw uploads to</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    18-- "<div>Reads originals from and<br />stores extracted content in</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    19-- "<div>Reads originals from and<br />stores chunk manifests in</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    18-- "<div>Requests document conversion<br />from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->47
+    19-- "<div>Requests hybrid chunking from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->47
+    20-- "<div>Requests chunk embeddings<br />from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    20-- "<div>Requests chunk embeddings<br />from (opt-in profile)</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    20-- "<div>Writes chunk vectors and<br />bookkeeping to</div><div style='font-size: 70%'>[JDBC]</div>" -->54
+
+  end

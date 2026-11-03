@@ -1,0 +1,48 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Dynamic diagram: process an uploaded document (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Write side (Kafka events)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        18["<div style='font-weight: bold'>Parsing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Converts documents into<br />structured content (headings,<br />tables, page provenance) via<br />Docling Serve and persists<br />the result.</div>"]
+        style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        19["<div style='font-weight: bold'>Chunking Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Splits documents into<br />retrieval-sized chunks<br />carrying a heading path and<br />source anchor, via Docling<br />Serve.</div>"]
+        style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        20["<div style='font-weight: bold'>Embedding Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI]</div><div style='font-size: 80%; margin-top:10px'>Embeds chunks with the active<br />embedding provider. Sole<br />writer of the PGVector index.</div>"]
+        style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        21["<div style='font-weight: bold'>Document Catalog & Lifecycle Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Projects each document's<br />current lifecycle stage and<br />coordinates document<br />deletion.</div>"]
+        style 21 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      46["<div style='font-weight: bold'>MinIO</div><div style='font-size: 70%; margin-top: 0px'>[Container: MinIO (S3 API)]</div><div style='font-size: 80%; margin-top:10px'>Object storage for raw<br />uploads, extracted content,<br />and chunk manifests.</div>"]
+      style 46 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      47["<div style='font-weight: bold'>Docling Serve</div><div style='font-size: 70%; margin-top: 0px'>[Container: Docling Serve (Python, vendored image)]</div><div style='font-size: 80%; margin-top:10px'>Vendored<br />document-understanding<br />engine: converts and chunks<br />documents. Official image, no<br />owned code.</div>"]
+      style 47 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      48["<div style='font-weight: bold'>Ollama</div><div style='font-size: 70%; margin-top: 0px'>[Container: Ollama]</div><div style='font-size: 80%; margin-top:10px'>Default self-hosted chat and<br />embedding model runtime.</div>"]
+      style 48 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      54[("<div style='font-weight: bold'>embedding-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL, pgvector]</div><div style='font-size: 80%; margin-top:10px'>Embedding Service bookkeeping<br />and its outbox, plus the<br />shared PGVector index.<br />Written by Embedding Service<br />only; read by Retrieval<br />Service.</div>")]
+      style 54 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    44-. "<div>1. Delivers DocumentUploaded</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->18
+    18-- "<div>2. Requests conversion</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->47
+    18-- "<div>3. Stores extracted content<br />(claim-check)</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    18-. "<div>4. Publishes DocumentParsed</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    44-. "<div>5. Delivers DocumentParsed</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->19
+    19-- "<div>6. Requests hybrid chunking</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->47
+    19-. "<div>7. Publishes ChunkCreated per<br />chunk, then DocumentChunked</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    44-. "<div>8. Delivers ChunkCreated</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->20
+    20-- "<div>9. Embeds chunk text</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    20-- "<div>10. Writes the vector to the<br />PGVector index</div><div style='font-size: 70%'>[JDBC]</div>" -->54
+    20-. "<div>11. Publishes<br />DocumentEmbeddingCompleted</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    44-. "<div>12. Delivers<br />DocumentEmbeddingCompleted:<br />stage becomes INDEXED</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->21
+
+  end

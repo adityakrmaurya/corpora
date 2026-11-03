@@ -1,0 +1,49 @@
+graph LR
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Container diagram for Corpora: write-side events"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Write side (Kafka events)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        10["<div style='font-weight: bold'>Request Validator Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Applies submission policy to<br />candidate uploads: quota,<br />MIME allow-list, malware scan<br />result, content-hash dedup.</div>"]
+        style 10 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        11["<div style='font-weight: bold'>Ingestion Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, WebFlux]</div><div style='font-size: 80%; margin-top:10px'>Accepts streamed uploads,<br />stages raw bytes in MinIO,<br />mints the documentId, and<br />publishes DocumentUploaded.</div>"]
+        style 11 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        18["<div style='font-weight: bold'>Parsing Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Converts documents into<br />structured content (headings,<br />tables, page provenance) via<br />Docling Serve and persists<br />the result.</div>"]
+        style 18 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        19["<div style='font-weight: bold'>Chunking Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Splits documents into<br />retrieval-sized chunks<br />carrying a heading path and<br />source anchor, via Docling<br />Serve.</div>"]
+        style 19 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        20["<div style='font-weight: bold'>Embedding Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI]</div><div style='font-size: 80%; margin-top:10px'>Embeds chunks with the active<br />embedding provider. Sole<br />writer of the PGVector index.</div>"]
+        style 20 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        21["<div style='font-weight: bold'>Document Catalog & Lifecycle Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Projects each document's<br />current lifecycle stage and<br />coordinates document<br />deletion.</div>"]
+        style 21 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        22["<div style='font-weight: bold'>Audit Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot]</div><div style='font-size: 80%; margin-top:10px'>Builds an append-only<br />compliance log from every<br />enumerated domain event<br />topic. Offers a read-only<br />query API.</div>"]
+        style 22 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        9["<div style='font-weight: bold'>Authorization & Identity-Context Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Decides whether a principal<br />may act on a corpus or<br />document; owns corpus- and<br />document-level grants.</div>"]
+        style 9 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    18-. "<div>Publishes DocumentParsed and<br />DocumentParsingFailed via<br />outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    19-. "<div>Publishes ChunkCreated,<br />DocumentChunked, and<br />DocumentChunkingFailed via<br />outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    20-. "<div>Publishes ChunkEmbedded,<br />ChunkEmbeddingFailed, and<br />DocumentEmbeddingCompleted<br />via outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    21-. "<div>Publishes<br />DocumentDeletionRequested and<br />DocumentDeleted via outbox<br />relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    44-. "<div>Delivers DocumentUploaded and<br />DocumentDeletionRequested to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->18
+    44-. "<div>Delivers DocumentParsed and<br />DocumentDeletionRequested to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->19
+    44-. "<div>Delivers ChunkCreated and<br />DocumentDeletionRequested to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->20
+    44-. "<div>Delivers<br />DocumentDeletionRequested to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->11
+    44-. "<div>Delivers upload, parse,<br />chunk, and embedding<br />lifecycle events and their<br />failures to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->21
+    44-. "<div>Delivers every audited domain<br />event to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->22
+    11-. "<div>Publishes DocumentUploaded<br />via outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    10-. "<div>Publishes<br />DocumentUploadRejected via<br />outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    9-. "<div>Publishes AccessGranted and<br />AccessDenied via outbox relay<br />to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+
+  end

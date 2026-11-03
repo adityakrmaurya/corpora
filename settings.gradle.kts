@@ -13,6 +13,6 @@ dependencyResolutionManagement {
     }
 }
 
-// Service modules are added here as they're scaffolded (see docs/architecture/c4-container.md
+// Service modules are added here as they're scaffolded (see docs/architecture/arc42/05-building-block-view.md
 // for the full 14-service list and docs/adr/0012-database-per-service-postgres-instances.md /
 // 0014-single-language-java-stack.md for why this is one multi-module Gradle build).

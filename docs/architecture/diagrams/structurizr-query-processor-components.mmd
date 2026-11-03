@@ -1,0 +1,65 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Component diagram for Query Processor Service (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph 23 ["Query Processor Service"]
+        style 23 fill:#ffffff,stroke:#2e6295,color:#2e6295
+
+        24["<div style='font-weight: bold'>ChatStreamEndpoint</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC server-streaming]</div><div style='font-size: 80%; margin-top:10px'>Entry point from the Gateway.<br />Receives trusted tenant and<br />ACL claims as gRPC metadata.</div>"]
+        style 24 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        25["<div style='font-weight: bold'>QueryRewriter</div><div style='font-size: 70%; margin-top: 0px'>[Component: Domain service]</div><div style='font-size: 80%; margin-top:10px'>Resolves pronouns and<br />ellipsis; decomposes the<br />question.</div>"]
+        style 25 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        26["<div style='font-weight: bold'>IntentClassifier</div><div style='font-size: 70%; margin-top: 0px'>[Component: Domain service]</div><div style='font-size: 80%; margin-top:10px'>Classifies intent: factual,<br />summarization, or comparison.</div>"]
+        style 26 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        27["<div style='font-weight: bold'>FilterHintExtractor</div><div style='font-size: 70%; margin-top: 0px'>[Component: Domain service]</div><div style='font-size: 80%; margin-top:10px'>Derives an untrusted<br />ExtractedFilterHint that can<br />only narrow results.</div>"]
+        style 27 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        28["<div style='font-weight: bold'>AnswerOrchestrator</div><div style='font-size: 70%; margin-top: 0px'>[Component: Saga-style coordinator]</div><div style='font-size: 80%; margin-top:10px'>Single owner of the total<br />deadline budget, retry and<br />circuit-breaking logic, and<br />the root trace span.</div>"]
+        style 28 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        29["<div style='font-weight: bold'>DeadlineManager</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC deadlines]</div><div style='font-size: 80%; margin-top:10px'>Propagates the remaining<br />deadline on every downstream<br />gRPC call.</div>"]
+        style 29 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        30["<div style='font-weight: bold'>RetrievalClient</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC stub]</div><div style='font-size: 80%; margin-top:10px'>Calls FindCandidates on<br />Retrieval Service.</div>"]
+        style 30 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        31["<div style='font-weight: bold'>RerankerClient</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC stub]</div><div style='font-size: 80%; margin-top:10px'>Calls Rerank on Reranker<br />Service.</div>"]
+        style 31 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        32["<div style='font-weight: bold'>ResponseFormatterClient</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC bidirectional stub]</div><div style='font-size: 80%; margin-top:10px'>Calls FormatStream on<br />Response Formatter Service.</div>"]
+        style 32 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        33["<div style='font-weight: bold'>AsyncAuditPublisher</div><div style='font-size: 70%; margin-top: 0px'>[Component: spring-kafka, fire-and-forget]</div><div style='font-size: 80%; margin-top:10px'>Publishes QueryReceived,<br />QueryRewritten, QueryAnswered<br />without ever blocking the<br />response.</div>"]
+        style 33 fill:#85bbf0,stroke:#5d82a8,color:#000000
+      end
+
+      34["<div style='font-weight: bold'>Retrieval Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Embeds the query and runs an<br />ACL-filtered similarity<br />search over PGVector.</div>"]
+      style 34 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      41["<div style='font-weight: bold'>Reranker Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, DJL, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Re-scores candidate chunks<br />with a cross-encoder and<br />removes near-duplicates with<br />MMR.</div>"]
+      style 41 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      42["<div style='font-weight: bold'>Response Formatter Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Assembles citations and<br />shapes the answer into a<br />typed stream of citations,<br />token, done, and error<br />events.</div>"]
+      style 42 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Cloud Gateway]</div><div style='font-size: 80%; margin-top:10px'>Single entry point: TLS<br />termination, edge JWT<br />validation, routing, CORS,<br />rate limiting, correlation-ID<br />injection, SSE-to-gRPC<br />translation for chat.</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    34-. "<div>Publishes ChunksRetrieved,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    41-. "<div>Publishes RerankPerformed,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    42-. "<div>Publishes ResponseFormatted,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    8-- "<div>Forwards chat requests to</div><div style='font-size: 70%'>[gRPC]</div>" -->24
+    24-- "<div>1. Rewrites the question with</div><div style='font-size: 70%'></div>" -->25
+    24-- "<div>2. Classifies intent with</div><div style='font-size: 70%'></div>" -->26
+    24-- "<div>3. Extracts filter hints with</div><div style='font-size: 70%'></div>" -->27
+    24-- "<div>4. Orchestrates the answer<br />with</div><div style='font-size: 70%'></div>" -->28
+    24-- "<div>Reports query lifecycle to</div><div style='font-size: 70%'></div>" -->33
+    28-- "<div>Enforces the budget with</div><div style='font-size: 70%'></div>" -->29
+    28-- "<div>Retrieves candidates through</div><div style='font-size: 70%'></div>" -->30
+    28-- "<div>Reranks through</div><div style='font-size: 70%'></div>" -->31
+    28-- "<div>Streams the answer through</div><div style='font-size: 70%'></div>" -->32
+    30-- "<div>Calls FindCandidates on</div><div style='font-size: 70%'>[gRPC]</div>" -->34
+    31-- "<div>Calls Rerank on</div><div style='font-size: 70%'>[gRPC]</div>" -->41
+    32-- "<div>Calls FormatStream on</div><div style='font-size: 70%'>[gRPC (bidirectional streaming)]</div>" -->42
+    33-. "<div>Publishes audit events,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+
+  end

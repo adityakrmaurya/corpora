@@ -1,0 +1,60 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Container diagram for Corpora: read side"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Knowledge Worker</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Uploads documents and asks<br />questions against the corpus.</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+    4["<div style='font-weight: bold'>Keycloak</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>OIDC identity provider.<br />Source of truth for users,<br />groups, and tenants.</div>"]
+    style 4 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+    5["<div style='font-weight: bold'>Cloud LLM Providers</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Opt-in Azure OpenAI, AWS<br />Bedrock, or Anthropic,<br />selected by Spring profile<br />instead of the default<br />Ollama.</div>"]
+    style 5 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph group1 ["Read side (gRPC)"]
+        style group1 fill:#ffffff,stroke:#cccccc,color:#cccccc,stroke-dasharray:5
+
+        23["<div style='font-weight: bold'>Query Processor Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Orchestrates one question end<br />to end and owns the total<br />deadline budget.</div>"]
+        style 23 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        34["<div style='font-weight: bold'>Retrieval Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Embeds the query and runs an<br />ACL-filtered similarity<br />search over PGVector.</div>"]
+        style 34 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        41["<div style='font-weight: bold'>Reranker Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, DJL, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Re-scores candidate chunks<br />with a cross-encoder and<br />removes near-duplicates with<br />MMR.</div>"]
+        style 41 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        42["<div style='font-weight: bold'>Response Formatter Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Assembles citations and<br />shapes the answer into a<br />typed stream of citations,<br />token, done, and error<br />events.</div>"]
+        style 42 fill:#438dd5,stroke:#2e6295,color:#ffffff
+        43["<div style='font-weight: bold'>LLM Router Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, Spring AI, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Chooses the chat provider and<br />model per request by tenant<br />tier, capability, and<br />provider health; falls back<br />on failure.</div>"]
+        style 43 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      end
+
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      48["<div style='font-weight: bold'>Ollama</div><div style='font-size: 70%; margin-top: 0px'>[Container: Ollama]</div><div style='font-size: 80%; margin-top:10px'>Default self-hosted chat and<br />embedding model runtime.</div>"]
+      style 48 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      54[("<div style='font-weight: bold'>embedding-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL, pgvector]</div><div style='font-size: 80%; margin-top:10px'>Embedding Service bookkeeping<br />and its outbox, plus the<br />shared PGVector index.<br />Written by Embedding Service<br />only; read by Retrieval<br />Service.</div>")]
+      style 54 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Cloud Gateway]</div><div style='font-size: 80%; margin-top:10px'>Single entry point: TLS<br />termination, edge JWT<br />validation, routing, CORS,<br />rate limiting, correlation-ID<br />injection, SSE-to-gRPC<br />translation for chat.</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    23-. "<div>Publishes QueryReceived,<br />QueryRewritten, and<br />QueryAnswered,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    34-. "<div>Publishes ChunksRetrieved,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    41-. "<div>Publishes RerankPerformed,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    43-. "<div>Publishes LlmInvoked,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    42-. "<div>Publishes ResponseFormatted,<br />fire-and-forget, to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    1-- "<div>Uploads documents, tracks<br />status, and asks questions<br />via</div><div style='font-size: 70%'>[HTTPS]</div>" -->8
+    8-- "<div>Fetches signing keys to<br />validate access tokens from</div><div style='font-size: 70%'>[HTTPS (JWKS)]</div>" -->4
+    8-- "<div>Forwards chat requests to,<br />translating SSE to gRPC<br />streaming</div><div style='font-size: 70%'>[gRPC]</div>" -->23
+    23-- "<div>Requests candidate chunks<br />(FindCandidates) from</div><div style='font-size: 70%'>[gRPC]</div>" -->34
+    23-- "<div>Requests reranking (Rerank)<br />from</div><div style='font-size: 70%'>[gRPC]</div>" -->41
+    23-- "<div>Calls FormatStream on</div><div style='font-size: 70%'>[gRPC (bidirectional streaming)]</div>" -->42
+    42-- "<div>Requests streamed chat<br />completions from</div><div style='font-size: 70%'>[gRPC]</div>" -->43
+    34-- "<div>Requests query embeddings<br />from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    34-- "<div>Requests query embeddings<br />from (opt-in profile)</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    34-- "<div>Reads vectors by ACL-filtered<br />similarity search from<br />(read-only DB role)</div><div style='font-size: 70%'>[JDBC]</div>" -->54
+    43-- "<div>Requests chat completions<br />from</div><div style='font-size: 70%'>[HTTP/REST]</div>" -->48
+    43-- "<div>Requests chat completions<br />from (opt-in profile)</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+
+  end

@@ -1,0 +1,29 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["System Context diagram for Corpora"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    1["<div style='font-weight: bold'>Knowledge Worker</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Uploads documents and asks<br />questions against the corpus.</div>"]
+    style 1 fill:#08427b,stroke:#052e56,color:#ffffff
+    2["<div style='font-weight: bold'>Corpus Administrator</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Manages corpora, document<br />ACLs, and tenant and routing<br />policy.</div>"]
+    style 2 fill:#08427b,stroke:#052e56,color:#ffffff
+    3["<div style='font-weight: bold'>Compliance / Audit Officer</div><div style='font-size: 70%; margin-top: 0px'>[Person]</div><div style='font-size: 80%; margin-top:10px'>Reviews the audit trail: who<br />accessed what, and why.</div>"]
+    style 3 fill:#08427b,stroke:#052e56,color:#ffffff
+    4["<div style='font-weight: bold'>Keycloak</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>OIDC identity provider.<br />Source of truth for users,<br />groups, and tenants.</div>"]
+    style 4 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+    5["<div style='font-weight: bold'>Cloud LLM Providers</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Opt-in Azure OpenAI, AWS<br />Bedrock, or Anthropic,<br />selected by Spring profile<br />instead of the default<br />Ollama.</div>"]
+    style 5 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+    6["<div style='font-weight: bold'>Observability Stack</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Prometheus, Grafana, Tempo,<br />and Loki: receives metrics,<br />traces, and logs.</div>"]
+    style 6 fill:#6b6b6b,stroke:#4a4a4a,color:#ffffff
+    7["<div style='font-weight: bold'>Corpora</div><div style='font-size: 70%; margin-top: 0px'>[Software System]</div><div style='font-size: 80%; margin-top:10px'>Ingests, indexes, and answers<br />questions over enterprise<br />documents, enforcing access<br />control per document.</div>"]
+    style 7 fill:#1168bd,stroke:#0b4884,color:#ffffff
+
+    1-- "<div>Uploads documents, tracks<br />status, and asks questions<br />using</div><div style='font-size: 70%'>[HTTPS]</div>" -->7
+    2-- "<div>Manages corpora, document<br />ACLs, and routing policy<br />using</div><div style='font-size: 70%'>[HTTPS]</div>" -->7
+    3-- "<div>Queries the audit trail using</div><div style='font-size: 70%'>[HTTPS]</div>" -->7
+    7-- "<div>Validates JWTs and resolves<br />claims with</div><div style='font-size: 70%'>[OIDC, JWKS]</div>" -->4
+    7-- "<div>Requests chat completions and<br />embeddings from (opt-in<br />profiles)</div><div style='font-size: 70%'>[HTTPS]</div>" -->5
+    7-- "<div>Exports metrics, traces, and<br />logs to</div><div style='font-size: 70%'>[OTLP]</div>" -->6
+
+  end

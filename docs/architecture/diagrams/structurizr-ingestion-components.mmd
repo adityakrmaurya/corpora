@@ -1,0 +1,56 @@
+graph TB
+  linkStyle default fill:#ffffff
+
+  subgraph diagram ["Component diagram for Ingestion Service (Corpora)"]
+    style diagram fill:#ffffff,stroke:#ffffff
+
+    subgraph 7 ["Corpora"]
+      style 7 fill:#ffffff,stroke:#0b4884,color:#0b4884
+
+      subgraph 11 ["Ingestion Service"]
+        style 11 fill:#ffffff,stroke:#2e6295,color:#2e6295
+
+        12["<div style='font-weight: bold'>UploadController</div><div style='font-size: 70%; margin-top: 0px'>[Component: Spring WebFlux controller]</div><div style='font-size: 80%; margin-top:10px'>Streams multipart bytes to<br />MinIO without buffering, then<br />validates, authorizes, and<br />commits the upload.</div>"]
+        style 12 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        13["<div style='font-weight: bold'>RequestValidatorClient</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC stub]</div><div style='font-size: 80%; margin-top:10px'>Calls Request Validator<br />Service before the upload<br />commits.</div>"]
+        style 13 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        14["<div style='font-weight: bold'>AuthorizationClient</div><div style='font-size: 70%; margin-top: 0px'>[Component: gRPC stub]</div><div style='font-size: 80%; margin-top:10px'>Asks Authorization &<br />Identity-Context Service<br />whether the caller may upload<br />to the corpus.</div>"]
+        style 14 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        15["<div style='font-weight: bold'>UploadService</div><div style='font-size: 70%; margin-top: 0px'>[Component: Domain service]</div><div style='font-size: 80%; margin-top:10px'>Owns the Upload aggregate.<br />Stores the aggregate and its<br />event row in one transaction.</div>"]
+        style 15 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        16["<div style='font-weight: bold'>TransactionalOutbox</div><div style='font-size: 70%; margin-top: 0px'>[Component: Spring Data JPA, poller]</div><div style='font-size: 80%; margin-top:10px'>Writes events to the outbox<br />table inside the aggregate's<br />transaction; a poller relays<br />them.</div>"]
+        style 16 fill:#85bbf0,stroke:#5d82a8,color:#000000
+        17["<div style='font-weight: bold'>DocumentUploadedProducer</div><div style='font-size: 70%; margin-top: 0px'>[Component: spring-kafka]</div><div style='font-size: 80%; margin-top:10px'>Publishes relayed outbox rows<br />to Kafka.</div>"]
+        style 17 fill:#85bbf0,stroke:#5d82a8,color:#000000
+      end
+
+      10["<div style='font-weight: bold'>Request Validator Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Applies submission policy to<br />candidate uploads: quota,<br />MIME allow-list, malware scan<br />result, content-hash dedup.</div>"]
+      style 10 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      44["<div style='font-weight: bold'>Kafka</div><div style='font-size: 70%; margin-top: 0px'>[Container: Apache Kafka (KRaft)]</div><div style='font-size: 80%; margin-top:10px'>Event backbone. Retains<br />events for replay; documentId<br />is the partition key. Hosts<br />retry topics and per-topic<br />DLQs.</div>"]
+      style 44 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      46["<div style='font-weight: bold'>MinIO</div><div style='font-size: 70%; margin-top: 0px'>[Container: MinIO (S3 API)]</div><div style='font-size: 80%; margin-top:10px'>Object storage for raw<br />uploads, extracted content,<br />and chunk manifests.</div>"]
+      style 46 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      51[("<div style='font-weight: bold'>ingestion-db</div><div style='font-size: 70%; margin-top: 0px'>[Container: PostgreSQL]</div><div style='font-size: 80%; margin-top:10px'>Private store of Ingestion<br />Service: Upload aggregate and<br />its outbox.</div>")]
+      style 51 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      8["<div style='font-weight: bold'>API Gateway</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Cloud Gateway]</div><div style='font-size: 80%; margin-top:10px'>Single entry point: TLS<br />termination, edge JWT<br />validation, routing, CORS,<br />rate limiting, correlation-ID<br />injection, SSE-to-gRPC<br />translation for chat.</div>"]
+      style 8 fill:#438dd5,stroke:#2e6295,color:#ffffff
+      9["<div style='font-weight: bold'>Authorization & Identity-Context Service</div><div style='font-size: 70%; margin-top: 0px'>[Container: Java 25, Spring Boot, gRPC]</div><div style='font-size: 80%; margin-top:10px'>Decides whether a principal<br />may act on a corpus or<br />document; owns corpus- and<br />document-level grants.</div>"]
+      style 9 fill:#438dd5,stroke:#2e6295,color:#ffffff
+    end
+
+    8-- "<div>Forwards document uploads to</div><div style='font-size: 70%'>[HTTP (multipart)]</div>" -->12
+    12-- "<div>Streams raw bytes to</div><div style='font-size: 70%'>[S3 API]</div>" -->46
+    12-- "<div>Validates before commit<br />through</div><div style='font-size: 70%'></div>" -->13
+    12-- "<div>Authorizes the upload through</div><div style='font-size: 70%'></div>" -->14
+    12-- "<div>Commits the upload through</div><div style='font-size: 70%'></div>" -->15
+    13-- "<div>Calls</div><div style='font-size: 70%'>[gRPC]</div>" -->10
+    14-- "<div>Calls</div><div style='font-size: 70%'>[gRPC]</div>" -->9
+    15-- "<div>Persists the Upload aggregate<br />in</div><div style='font-size: 70%'>[JDBC]</div>" -->51
+    15-- "<div>Records DocumentUploaded in<br />the same transaction through</div><div style='font-size: 70%'></div>" -->16
+    16-- "<div>Stores and polls outbox rows<br />in</div><div style='font-size: 70%'>[JDBC]</div>" -->51
+    16-- "<div>Hands relayed rows to</div><div style='font-size: 70%'></div>" -->17
+    17-. "<div>Publishes DocumentUploaded to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    10-. "<div>Publishes<br />DocumentUploadRejected via<br />outbox relay to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+    9-. "<div>Publishes AccessGranted and<br />AccessDenied via outbox relay<br />to</div><div style='font-size: 70%'>[Kafka protocol]</div>" .->44
+
+  end

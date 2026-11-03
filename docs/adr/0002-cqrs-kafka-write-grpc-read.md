@@ -27,7 +27,7 @@ Chosen option: **3**. Write-side services (Ingestion, Parsing, Chunking, Embeddi
 ## Consequences
 
 **Good:**
-- The read path gets binary payloads, HTTP/2 multiplexing, native streaming, and built-in deadline propagation (see `docs/architecture/c4-component-query-processor-service.md`) — the properties that actually matter for a bounded chat-latency budget.
+- The read path gets binary payloads, HTTP/2 multiplexing, native streaming, and built-in deadline propagation (see `docs/architecture/arc42/05-building-block-view.md`, section 5.2, Query Processor Service) — the properties that actually matter for a bounded chat-latency budget.
 - The write path gets durable, replayable, independently-consumable events — the properties that matter for a multi-stage, multi-consumer ingestion pipeline and for compliance audit (ADR-0011).
 
 **Bad:**

@@ -23,7 +23,7 @@ An initial design proposed a single Spring Boot "modular monolith" for the docum
 
 ## Decision Outcome
 
-Chosen option: **3 — full DDD bounded-context decomposition**, yielding 14 services (see `docs/architecture/c4-container.md` for the full list). Each service owns exactly one bounded context: its own aggregate/domain model, its own datastore schema, and a small, explicit set of inbound/outbound contracts (events or APIs). No service is introduced without an aggregate root and a clear "what this service does NOT own" statement (documented per-service in the component diagrams and `docs/architecture/ubiquitous-language.md`).
+Chosen option: **3 — full DDD bounded-context decomposition**, yielding 14 services (see `docs/architecture/arc42/05-building-block-view.md` for the full list). Each service owns exactly one bounded context: its own aggregate/domain model, its own datastore schema, and a small, explicit set of inbound/outbound contracts (events or APIs). No service is introduced without an aggregate root and a clear "what this service does NOT own" statement (documented per-service in the building block view and `docs/architecture/arc42/12-glossary.md`).
 
 ## Consequences
 
@@ -34,7 +34,7 @@ Chosen option: **3 — full DDD bounded-context decomposition**, yielding 14 ser
 
 **Bad:**
 - Significantly higher operational complexity than a monolith: 14 deployables, network calls where there used to be method calls, distributed tracing/observability becomes mandatory rather than optional (see ADR-0014 note on tracing).
-- Requires disciplined contract versioning (see `docs/architecture/event-catalog.md`) since services deploy independently.
+- Requires disciplined contract versioning (see `docs/reference/events.md`) since services deploy independently.
 
 ## Alternatives Considered (detail)
 
